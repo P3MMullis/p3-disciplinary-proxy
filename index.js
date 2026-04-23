@@ -27,12 +27,14 @@ app.post('/api/message', async (req, res) => {
   } catch(err) { res.status(500).json({ error: 'Proxy error: ' + err.message }); }
 });
 
-// PDF form filling using pdf-lib
+// PDF form filling
 app.post('/api/generate-pdf', async (req, res) => {
   if (!fs.existsSync(BLANK_FORM_PATH)) return res.status(500).json({ error: 'Blank form not found on server.' });
 
   try {
-    const { PDFDocument, StandardFonts } = require('pdf-lib');
+    const { PDFDocument } = require('pdf-lib');
+    const { degrees } = require('pdf-lib');
+
     const pdfBytes = fs.readFileSync(BLANK_FORM_PATH);
     const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
     const form = pdfDoc.getForm();
@@ -47,14 +49,13 @@ app.post('/api/generate-pdf', async (req, res) => {
       description, expectation, training, target_date
     } = req.body;
 
-    // Set text field with explicit font size, overriding default
+    const FONT_SIZE = 11;
+
     const setText = (name, value, fontSize) => {
       try {
         const field = form.getTextField(name);
         field.setText(value || '');
-        field.setFontSize(fontSize || 9);
-        // Force auto-size off so our font size sticks
-        field.acroField.setDefaultAppearance(`/Helv ${fontSize || 9} Tf 0 g`);
+        field.setFontSize(fontSize || FONT_SIZE);
       } catch(e) { console.log('Field not found:', name); }
     };
 
@@ -63,30 +64,27 @@ app.post('/api/generate-pdf', async (req, res) => {
       catch(e) { console.log('Checkbox not found:', name); }
     };
 
-    // All fields — consistent font size throughout
-    const FONT = 9;
-    setText('Date_Form', date_form || '', FONT);
-    setText('Employee_Name', employee_name || '', FONT);
-    setText('Employee_Title', employee_title || '', FONT);
-    setText('Employee_ID', employee_id || '', FONT);
-    setText('Date_Hired', date_hired || '', FONT);
-    setText('Employee_Department', department || '', FONT);
-    setText('Manager_Name', manager_name || '', FONT);
-    setText('Date_Occurrence', date_occurrence || '', FONT);
-    setText('Location_Occurence', location || '', FONT);
-    setText('Prior_Corrective_Action', prior_action || 'None', FONT);
-    setText('TargetDate', target_date || '', FONT);
-    setText('SpecificDescription_of_Issue', description || '', FONT);
-    setText('Expectation_for_Correction', expectation || '', FONT);
-    setText('TrainingAssigned_GoalsImprovement', training || '', FONT);
+    // All fields at consistent font size
+    setText('Date_Form', date_form || '', FONT_SIZE);
+    setText('Employee_Name', employee_name || '', FONT_SIZE);
+    setText('Employee_Title', employee_title || '', FONT_SIZE);
+    setText('Employee_ID', employee_id || '', FONT_SIZE);
+    setText('Date_Hired', date_hired || '', FONT_SIZE);
+    setText('Employee_Department', department || '', FONT_SIZE);
+    setText('Manager_Name', manager_name || '', FONT_SIZE);
+    setText('Date_Occurrence', date_occurrence || '', FONT_SIZE);
+    setText('Location_Occurence', location || '', FONT_SIZE);
+    setText('Prior_Corrective_Action', prior_action || 'None', FONT_SIZE);
+    setText('TargetDate', target_date || '', FONT_SIZE);
+    setText('SpecificDescription_of_Issue', description || '', FONT_SIZE);
+    setText('Expectation_for_Correction', expectation || '', FONT_SIZE);
+    setText('TrainingAssigned_GoalsImprovement', training || '', FONT_SIZE);
 
-    // Checkboxes - current action
+    // Checkboxes
     setCheck('CurrentAction_Counseling', action_counseling);
     setCheck('CurrentAction_VerbalWarning', action_verbal);
     setCheck('CurrentAction_WrittenWarning', action_written);
     setCheck('CurrentAction_FinalWarning', action_final);
-
-    // Checkboxes - issue categories
     setCheck('GeneralIssue_Absenteeism', issue_absenteeism);
     setCheck('GeneralIssue_Tardiness', issue_tardiness);
     setCheck('GeneralIssue_Conduct', issue_conduct);
