@@ -47,12 +47,14 @@ app.post('/api/generate-pdf', async (req, res) => {
       description, expectation, training, target_date
     } = req.body;
 
-    // Set text field with explicit font size
+    // Set text field with explicit font size, overriding default
     const setText = (name, value, fontSize) => {
       try {
         const field = form.getTextField(name);
         field.setText(value || '');
-        field.setFontSize(fontSize || 10);
+        field.setFontSize(fontSize || 9);
+        // Force auto-size off so our font size sticks
+        field.acroField.setDefaultAppearance(`/Helv ${fontSize || 9} Tf 0 g`);
       } catch(e) { console.log('Field not found:', name); }
     };
 
