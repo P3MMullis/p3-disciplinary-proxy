@@ -137,7 +137,12 @@ print('ok')
 
   try {
     fs.writeFileSync(tmpScript, pythonScript);
-    const result = spawnSync('python3', [tmpScript], { timeout: 30000, encoding: 'utf8' });
+    // Try multiple python executable names
+    let result;
+    for (const pyCmd of ['python3.11', 'python3', 'python']) {
+      result = spawnSync(pyCmd, [tmpScript], { timeout: 30000, encoding: 'utf8' });
+      if (!result.error) break;
+    }
 
     if (result.error) throw new Error(result.error.message);
     if (result.status !== 0) throw new Error(result.stderr || 'Python script failed');
