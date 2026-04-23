@@ -32,7 +32,7 @@ app.post('/api/generate-pdf', async (req, res) => {
   if (!fs.existsSync(BLANK_FORM_PATH)) return res.status(500).json({ error: 'Blank form not found on server.' });
 
   try {
-    const { PDFDocument } = require('pdf-lib');
+    const { PDFDocument, StandardFonts } = require('pdf-lib');
     const pdfBytes = fs.readFileSync(BLANK_FORM_PATH);
     const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
     const form = pdfDoc.getForm();
@@ -47,24 +47,36 @@ app.post('/api/generate-pdf', async (req, res) => {
       description, expectation, training, target_date
     } = req.body;
 
-    // Fill text fields
-    const setText = (name, value) => { try { form.getTextField(name).setText(value || ''); } catch(e) { console.log('Field not found:', name); } };
-    const setCheck = (name, checked) => { try { const f = form.getCheckBox(name); checked ? f.check() : f.uncheck(); } catch(e) { console.log('Checkbox not found:', name); } };
+    // Set text field with explicit font size
+    const setText = (name, value, fontSize) => {
+      try {
+        const field = form.getTextField(name);
+        field.setText(value || '');
+        field.setFontSize(fontSize || 10);
+      } catch(e) { console.log('Field not found:', name); }
+    };
 
-    setText('Date_Form', date_form || '');
-    setText('Employee_Name', employee_name || '');
-    setText('Employee_Title', employee_title || '');
-    setText('Employee_ID', employee_id || '');
-    setText('Date_Hired', date_hired || '');
-    setText('Employee_Department', department || '');
-    setText('Manager_Name', manager_name || '');
-    setText('Date_Occurrence', date_occurrence || '');
-    setText('Location_Occurence', location || '');
-    setText('Prior_Corrective_Action', prior_action || 'None');
-    setText('SpecificDescription_of_Issue', description || '');
-    setText('Expectation_for_Correction', expectation || '');
-    setText('TrainingAssigned_GoalsImprovement', training || '');
-    setText('TargetDate', target_date || '');
+    const setCheck = (name, checked) => {
+      try { const f = form.getCheckBox(name); checked ? f.check() : f.uncheck(); }
+      catch(e) { console.log('Checkbox not found:', name); }
+    };
+
+    // All fields — consistent font size throughout
+    const FONT = 9;
+    setText('Date_Form', date_form || '', FONT);
+    setText('Employee_Name', employee_name || '', FONT);
+    setText('Employee_Title', employee_title || '', FONT);
+    setText('Employee_ID', employee_id || '', FONT);
+    setText('Date_Hired', date_hired || '', FONT);
+    setText('Employee_Department', department || '', FONT);
+    setText('Manager_Name', manager_name || '', FONT);
+    setText('Date_Occurrence', date_occurrence || '', FONT);
+    setText('Location_Occurence', location || '', FONT);
+    setText('Prior_Corrective_Action', prior_action || 'None', FONT);
+    setText('TargetDate', target_date || '', FONT);
+    setText('SpecificDescription_of_Issue', description || '', FONT);
+    setText('Expectation_for_Correction', expectation || '', FONT);
+    setText('TrainingAssigned_GoalsImprovement', training || '', FONT);
 
     // Checkboxes - current action
     setCheck('CurrentAction_Counseling', action_counseling);
