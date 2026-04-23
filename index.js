@@ -38,9 +38,13 @@ app.post('/api/generate-pdf', async (req, res) => {
     const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
 
     // Set NeedAppearances = true so PDF viewer renders fields with our DA font
-    const acroForm = pdfDoc.catalog.get(PDFName.of('AcroForm'));
-    if (acroForm) {
-      acroForm.set(PDFName.of('NeedAppearances'), PDFBool.True);
+    try {
+      const acroForm = pdfDoc.catalog.lookup(PDFName.of('AcroForm'));
+      if (acroForm && acroForm.set) {
+        acroForm.set(PDFName.of('NeedAppearances'), PDFBool.True);
+      }
+    } catch(e) {
+      console.log('NeedAppearances set skipped:', e.message);
     }
 
     const {
