@@ -119,7 +119,36 @@ app.post('/api/generate-pdf', async (req, res) => {
 app.get('/', (req, res) => {
   res.json({ status: 'P3 Services API Proxy is running.', apiKeySet: !!API_KEY, formReady: fs.existsSync(BLANK_FORM_PATH) });
 });
+// ── GENERATE DOCX ─────────────────────────────────────────────────────────────
+app.post('/api/generate-docx', async (req, res) => {
+  const { script } = req.body;
+  if (!script) return res.status(400).json({ error: 'No script provided' });
 
+  const tmpDir = '/tmp/docx_' + Date.now();
+  const scriptPath = require('path').join(tmpDir, 'gen.js');
+  const outPath = '/tmp/performance_review.docx';
+
+  try {
+    require('fs').mkdirSync(tmpDir, { recursive: true });
+    const scriptWithPath = `process.chdir('${tmpDir}');\n${script}`;
+    require('fs').writeFileSync(scriptPath, scriptWithPath);
+    require('child_process').execSync('npm install docx --prefix ' + tmpDir, { timeout: 60000 });
+    require('child_process').execSync(`node ${scriptPath}`, { timeout: 30000 });
+
+    if (!require('fs').existsSync(outPath)) throw new Error('File not generated');
+
+    const buf = require('fs').readFileSync(outPath);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', 'attachment; filename="performance_review.docx"');
+    res.send(buf);
+  } catch (err) {
+    console.error('DOCX error:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    try { require('fs').rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    try { require('fs').unlinkSync(outPath); } catch {}
+  }
+});
 app.listen(PORT, () => {
   console.log('Proxy running on port ' + PORT);
   console.log('API Key set:', !!API_KEY);
