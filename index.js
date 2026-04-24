@@ -126,117 +126,103 @@ app.post('/api/generate-docx', async (req, res) => {
   if (!empName) return res.status(400).json({ error: 'No data provided' });
 
   try {
-    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-            AlignmentType, BorderStyle, WidthType, ShadingType, HeadingLevel } = require('docx');
+    const { Document, Packer, Paragraph, TextRun, TabStopType, TabStopPosition,
+            AlignmentType } = require('docx');
 
     const RATING = ['','Poor','Fair','Satisfactory','Good','Excellent'];
-    const border = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' };
-    const borders = { top: border, bottom: border, left: border, right: border };
-    const cell = (text, bold, shade) => new TableCell({
-      borders,
-      width: { size: 4680, type: WidthType.DXA },
-      shading: shade ? { fill: '1A2340', type: ShadingType.CLEAR } : undefined,
-      margins: { top: 80, bottom: 80, left: 120, right: 120 },
-      children: [new Paragraph({ children: [new TextRun({ text: text || '', bold: !!bold, color: shade ? 'FFFFFF' : '000000', size: 20 })] })]
-    });
+    const CAT_KEYS = ['job_knowledge','work_quality','attendance','initiative','communication','dependability','responsibility','leadership'];
+    const CAT_NAMES = ['Job Knowledge','Work Quality','Attendances/Punctuality','Initiative','Communication/Listening Skills','Dependability','Responsibility','Leadership'];
 
-    const CATS = ['job_knowledge','work_quality','attendance','initiative','communication','dependability','responsibility','leadership'];
-    const CAT_NAMES = ['Job Knowledge','Work Quality','Attendance / Punctuality','Initiative','Communication / Listening','Dependability','Responsibility','Leadership'];
+    const total = CAT_KEYS.reduce((s,k) => s + (parseInt(scores[k])||0), 0);
+    const avg = (total / CAT_KEYS.length).toFixed(1);
 
-    const total = CATS.reduce((s,k) => s + (parseInt(scores[k])||0), 0);
-    const avg = (total / CATS.length).toFixed(1);
+    const catRow = (name, scoreKey) => {
+      const s = parseInt(scores[scoreKey]) || 0;
+      return new Paragraph({
+        spacing: { before: 160, after: 40 },
+        children: [
+          new TextRun({ text: name + ':  ', bold: true, size: 22, font: 'Arial' }),
+          new TextRun({ text: s ? `${s} - ${RATING[s]}` : '', size: 22, font: 'Arial' })
+        ]
+      });
+    };
+
+    const narrativeLines = (narrative || '').split('\n').filter(l => l.trim());
 
     const doc = new Document({
       sections: [{
-        properties: {
-          page: {
-            size: { width: 12240, height: 15840 },
-            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
-          }
-        },
+        properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 } } },
         children: [
-          // Title
           new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 300 },
-            children: [new TextRun({ text: 'EMPLOYEE PERFORMANCE REVIEW', bold: true, size: 32, font: 'Arial' })]
+            alignment: AlignmentType.CENTER, spacing: { after: 240 },
+            children: [new TextRun({ text: 'EMPLOYEE PERFORMANCE REVIEW', bold: true, size: 28, font: 'Arial' })]
           }),
-
-          // Info table
-          new Table({
-            width: { size: 9360, type: WidthType.DXA },
-            columnWidths: [2340, 2340, 2340, 2340],
-            rows: [
-              new TableRow({ children: [
-                cell('Employee Name', true, true), cell(empName, false, false),
-                cell('Date', true, true), cell(date, false, false)
-              ]}),
-              new TableRow({ children: [
-                cell('Job Title', true, true), cell(empTitle, false, false),
-                cell('Supervisor', true, true), cell(supName, false, false)
-              ]}),
-              new TableRow({ children: [
-                cell('Review Period', true, true),
-                new TableCell({
-                  borders, columnSpan: 3,
-                  width: { size: 7020, type: WidthType.DXA },
-                  margins: { top: 80, bottom: 80, left: 120, right: 120 },
-                  children: [new Paragraph({ children: [new TextRun({ text: period || '', size: 20 })] })]
-                })
-              ]})
+          new Paragraph({
+            spacing: { after: 100 },
+            tabStops: [{ type: TabStopType.LEFT, position: 5400 }],
+            children: [
+              new TextRun({ text: 'Name:  ', bold: true, size: 22, font: 'Arial' }),
+              new TextRun({ text: empName || '', size: 22, font: 'Arial' }),
+              new TextRun({ text: '\t' }),
+              new TextRun({ text: 'Date:  ', bold: true, size: 22, font: 'Arial' }),
+              new TextRun({ text: date || '', size: 22, font: 'Arial' })
             ]
           }),
-
-          new Paragraph({ spacing: { before: 240, after: 120 }, children: [new TextRun({ text: 'RATINGS:  1 - Poor     2 - Fair     3 - Satisfactory     4 - Good     5 - Excellent', bold: true, size: 20, font: 'Arial' })] }),
-
-          // Scores table
-          new Table({
-            width: { size: 9360, type: WidthType.DXA },
-            columnWidths: [6240, 1560, 1560],
-            rows: [
-              new TableRow({ children: [
-                cell('Category', true, true),
-                cell('Score', true, true),
-                cell('Rating', true, true)
-              ]}),
-              ...CATS.map((k, i) => new TableRow({ children: [
-                new TableCell({ borders, width: { size: 6240, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: CAT_NAMES[i], size: 20 })] })] }),
-                new TableCell({ borders, width: { size: 1560, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(scores[k]||0), bold: true, size: 20 })] })] }),
-                new TableCell({ borders, width: { size: 1560, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: RATING[scores[k]||0]||'', size: 20 })] })] })
-              ]})),
-              new TableRow({ children: [
-                new TableCell({ borders, shading: { fill: 'F4F6FA', type: ShadingType.CLEAR }, width: { size: 6240, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: 'Overall Average', bold: true, size: 20 })] })] }),
-                new TableCell({ borders, shading: { fill: 'F4F6FA', type: ShadingType.CLEAR }, width: { size: 1560, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: avg, bold: true, size: 20 })] })] }),
-                new TableCell({ borders, shading: { fill: 'F4F6FA', type: ShadingType.CLEAR }, width: { size: 1560, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: RATING[Math.round(avg)]||'', bold: true, size: 20 })] })] })
-              ]})
+          new Paragraph({
+            spacing: { after: 100 },
+            tabStops: [{ type: TabStopType.LEFT, position: 5400 }],
+            children: [
+              new TextRun({ text: 'Job Title:  ', bold: true, size: 22, font: 'Arial' }),
+              new TextRun({ text: empTitle || '', size: 22, font: 'Arial' }),
+              new TextRun({ text: '\t' }),
+              new TextRun({ text: 'Supervisor:  ', bold: true, size: 22, font: 'Arial' }),
+              new TextRun({ text: supName || '', size: 22, font: 'Arial' })
             ]
           }),
-
-          // Comments / Narrative
-          new Paragraph({ spacing: { before: 300, after: 120 }, children: [new TextRun({ text: 'Comments:', bold: true, size: 22, font: 'Arial' })] }),
-          ...(narrative || '').split('\n').filter(l => l.trim()).map(line =>
-            new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: line, size: 20, font: 'Arial' })] })
-          ),
-
-          // Overall rating
-          new Paragraph({ spacing: { before: 200, after: 120 }, children: [new TextRun({ text: 'Overall Rating (average): ' + avg + ' — ' + (RATING[Math.round(avg)]||''), bold: true, size: 20, font: 'Arial' })] }),
-
-          // Goals
-          new Paragraph({ spacing: { before: 240, after: 120 }, children: [new TextRun({ text: 'GOALS: (as agreed upon by employee and supervisor)', bold: true, size: 22, font: 'Arial' })] }),
-          new Paragraph({ spacing: { after: 120 }, children: [new TextRun({ text: 'Goal #1:  ' + (goal1 || ''), size: 20, font: 'Arial' })] }),
-          new Paragraph({ spacing: { after: 240 }, children: [new TextRun({ text: 'Goal #2:  ' + (goal2 || ''), size: 20, font: 'Arial' })] }),
-
-          // Verification
-          new Paragraph({ spacing: { before: 200, after: 200 }, children: [new TextRun({ text: 'VERIFICATION OF REVIEW:', bold: true, size: 20, font: 'Arial' })] }),
-          new Paragraph({ spacing: { after: 300 }, children: [new TextRun({ text: 'By signing this form, you confirm that you have discussed this review in detail with your supervisor. Signing the form does not necessarily indicate that you agree with the evaluation.', size: 18, font: 'Arial' })] }),
-
-          // Signature lines
-          new Paragraph({ spacing: { after: 400 }, children: [
-            new TextRun({ text: 'Employee Signature: ________________________________     Date: _______________', size: 20, font: 'Arial' })
-          ]}),
-          new Paragraph({ children: [
-            new TextRun({ text: 'Supervisor Signature: ________________________________     Date: _______________', size: 20, font: 'Arial' })
-          ]})
+          new Paragraph({
+            spacing: { after: 200 },
+            children: [
+              new TextRun({ text: 'Review Period:  ', bold: true, size: 22, font: 'Arial' }),
+              new TextRun({ text: period || '', size: 22, font: 'Arial' })
+            ]
+          }),
+          new Paragraph({
+            spacing: { after: 240 },
+            children: [new TextRun({ text: 'RATINGS:     1-Poor     2-Fair     3-Satisfactory     4-Good     5-Excellent', bold: true, size: 22, font: 'Arial' })]
+          }),
+          ...CAT_KEYS.flatMap((key, i) => [
+            catRow(CAT_NAMES[i], key),
+            new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: 'Comments:  ', bold: true, size: 22, font: 'Arial' })] })
+          ]),
+          new Paragraph({
+            spacing: { before: 200, after: 100 },
+            children: [new TextRun({ text: `Overall Rating (average the rating numbers above)   ${avg}`, bold: true, size: 22, font: 'Arial' })]
+          }),
+          new Paragraph({ spacing: { after: 100 }, children: [new TextRun({ text: 'Evaluation:', bold: true, size: 22, font: 'Arial' })] }),
+          ...narrativeLines.map(line => new Paragraph({
+            spacing: { after: 120 },
+            children: [new TextRun({ text: line, size: 22, font: 'Arial' })]
+          })),
+          new Paragraph({
+            spacing: { before: 240, after: 120 },
+            children: [new TextRun({ text: 'GOALS: (as agreed upon by employee and supervisor)', bold: true, size: 22, font: 'Arial' })]
+          }),
+          new Paragraph({ spacing: { after: 120 }, children: [new TextRun({ text: 'Goal #1:  ', bold: true, size: 22, font: 'Arial' }), new TextRun({ text: goal1 || '', size: 22, font: 'Arial' })] }),
+          new Paragraph({ spacing: { after: 240 }, children: [new TextRun({ text: 'Goal #2:  ', bold: true, size: 22, font: 'Arial' }), new TextRun({ text: goal2 || '', size: 22, font: 'Arial' })] }),
+          new Paragraph({ spacing: { before: 200, after: 160 }, children: [new TextRun({ text: 'VERIFICATION OF REVIEW:', bold: true, size: 22, font: 'Arial' })] }),
+          new Paragraph({ spacing: { after: 320 }, children: [new TextRun({ text: 'By signing this form, you confirm that you have discussed this review in detail with your supervisor.  Signing the form does not necessarily indicate that you agree with the evaluation.', size: 20, font: 'Arial' })] }),
+          new Paragraph({
+            spacing: { after: 120 },
+            tabStops: [{ type: TabStopType.LEFT, position: 5400 }],
+            children: [new TextRun({ text: '__________________________', size: 22, font: 'Arial' }), new TextRun({ text: '\t' }), new TextRun({ text: 'Date: __________________', size: 22, font: 'Arial' })]
+          }),
+          new Paragraph({ spacing: { after: 280 }, children: [new TextRun({ text: 'Employee Signature', bold: true, size: 20, font: 'Arial' })] }),
+          new Paragraph({
+            spacing: { after: 120 },
+            tabStops: [{ type: TabStopType.LEFT, position: 5400 }],
+            children: [new TextRun({ text: '__________________________', size: 22, font: 'Arial' }), new TextRun({ text: '\t' }), new TextRun({ text: 'Date: ___________________', size: 22, font: 'Arial' })]
+          }),
+          new Paragraph({ children: [new TextRun({ text: 'Supervisor Signature', bold: true, size: 20, font: 'Arial' })] })
         ]
       }]
     });
