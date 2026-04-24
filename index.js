@@ -10,6 +10,7 @@ const BLANK_FORM_PATH = path.join(__dirname, 'blank_form.pdf');
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use(express.static(__dirname));
 
 app.post('/api/message', async (req, res) => {
   if (!API_KEY) return res.status(500).json({ error: 'API key not configured on server.' });
