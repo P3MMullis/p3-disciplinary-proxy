@@ -125,20 +125,23 @@ app.post('/api/generate-docx', async (req, res) => {
   const { script } = req.body;
   if (!script) return res.status(400).json({ error: 'No script provided' });
 
-  const tmpDir = '/tmp/docx_' + Date.now();
-  const scriptPath = require('path').join(tmpDir, 'gen.js');
-  const outPath = '/tmp/performance_review.docx';
+  const outPath = '/tmp/performance_review_' + Date.now() + '.docx';
+  const scriptPath = '/tmp/gen_' + Date.now() + '.js';
 
   try {
-    require('fs').mkdirSync(tmpDir, { recursive: true });
-    const scriptWithPath = `process.chdir('${tmpDir}');\n${script}`;
-    require('fs').writeFileSync(scriptPath, scriptWithPath);
-    require('child_process').execSync('npm install docx --prefix ' + tmpDir, { timeout: 60000 });
+    // Inject the node_modules path so docx resolves from the app directory
+    const wrappedScript = `
+      process.env.NODE_PATH = '${__dirname}/node_modules';
+      require('module').Module._initPaths();
+      const outPath = '${outPath}';
+      ${script.replace(/\/tmp\/performance_review\.docx/g, outPath)}
+    `;
+    fs.writeFileSync(scriptPath, wrappedScript);
     require('child_process').execSync(`node ${scriptPath}`, { timeout: 30000 });
 
-    if (!require('fs').existsSync(outPath)) throw new Error('File not generated');
+    if (!fs.existsSync(outPath)) throw new Error('File not generated');
 
-    const buf = require('fs').readFileSync(outPath);
+    const buf = fs.readFileSync(outPath);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', 'attachment; filename="performance_review.docx"');
     res.send(buf);
@@ -146,8 +149,8 @@ app.post('/api/generate-docx', async (req, res) => {
     console.error('DOCX error:', err.message);
     res.status(500).json({ error: err.message });
   } finally {
-    try { require('fs').rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-    try { require('fs').unlinkSync(outPath); } catch {}
+    try { fs.unlinkSync(scriptPath); } catch {}
+    try { fs.unlinkSync(outPath); } catch {}
   }
 });
 app.listen(PORT, () => {
